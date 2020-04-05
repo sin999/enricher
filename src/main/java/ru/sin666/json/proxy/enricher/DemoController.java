@@ -13,6 +13,7 @@ import ru.sin666.json.proxy.enricher.dto.Person;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -28,6 +29,7 @@ public class DemoController {
 
     /**
      * Endpoint to generate collection of person
+     *
      * @return
      */
     @GetMapping("/person/")
@@ -37,6 +39,7 @@ public class DemoController {
 
     /**
      * Gets the result of the first endpoint and enrich it with metadata
+     *
      * @return enriched collection of person
      * @throws ParseException
      */
@@ -50,19 +53,16 @@ public class DemoController {
     }
 
     private String enrich(String json) throws ParseException {
-        Function<Function<Integer, Boolean>, Function<JSONObject, JSONObject>> addCheckedFactory = metaDataSupplyer -> jsonChildObject -> {
-            Integer id = (Integer) jsonChildObject.get("id");
-            jsonChildObject.appendField("isChecked", metaDataSupplyer.apply(id));
-            return jsonChildObject;
-        };
+        Function<Function<Integer, Boolean>, Consumer<JSONObject>> addCheckedFactory =
+                metaDataSupplyer ->
+                        jsonChildObject ->
+                                jsonChildObject.appendField("isChecked", metaDataSupplyer.apply((Integer) jsonChildObject.get("id")));
 
         JSONArray jsonArray = (JSONArray) (new JSONParser(DEFAULT_PERMISSIVE_MODE)).parse(json);
         Set<String> ids = jsonArray.stream().map(obj -> (JSONObject) obj).map(e -> e.getAsString("id")).collect(Collectors.toSet());
-        Function<JSONObject, JSONObject> addChecked = addCheckedFactory.apply(getMetadataSupplier(ids, ""));
+        Consumer<JSONObject> addChecked = addCheckedFactory.apply(getMetadataSupplier(ids, ""));
 
-        jsonArray.stream().map(obj -> (JSONObject) obj).map(addChecked).count();
-
-
+        jsonArray.stream().map(obj -> (JSONObject) obj).forEach(addChecked);
         return jsonArray.toString();
     }
 
